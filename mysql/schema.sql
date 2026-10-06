@@ -15,6 +15,7 @@ CREATE DATABASE IF NOT EXISTS waterworks_plant
 USE waterworks_plant;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS raw_water_judgment_log;
 DROP TABLE IF EXISTS dosing_record_log;
 DROP TABLE IF EXISTS dosing_record;
 DROP TABLE IF EXISTS process_config;
@@ -36,7 +37,26 @@ CREATE TABLE raw_water (
     sample_at DATETIME,
     water_sample VARCHAR(64),
     status VARCHAR(16) NOT NULL,
-    created_at DATETIME
+    created_at DATETIME,
+    updated_at DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 原水人工重判裁决日志 ----------------
+-- 每次管理员重判追加一行，只增不改（操作者 / 时间 / 重判前后结论 / 原因 / 请求标识），逐次独立追溯。
+-- uk_rwjl_request 保证同一请求（快速连点 / 网络重试 / 重放）只落一份日志：
+-- 并发下同 request_id 的第二个 INSERT 必然唯一冲突，由后端转成幂等复用或明确的冲突提示。
+CREATE TABLE raw_water_judgment_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    raw_water_id BIGINT NOT NULL,
+    action VARCHAR(16) NOT NULL,
+    from_status VARCHAR(16),
+    to_status VARCHAR(16) NOT NULL,
+    operator_name VARCHAR(32) NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    request_id VARCHAR(64) NOT NULL,
+    created_at DATETIME,
+    UNIQUE KEY uk_rwjl_request (request_id),
+    KEY idx_rwjl_sample (raw_water_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------- 沉淀池 ----------------
@@ -202,13 +222,18 @@ CREATE TABLE dosing_record_log (
 -- 种子数据
 -- =====================================================================
 
-INSERT INTO raw_water (id, source_name, sample_at, water_sample, status, created_at) VALUES
-(1, '长江取水泵房', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 30 DAY, '7.30|1.20|0.60', '合格', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 30 DAY),
-(2, '长江取水泵房', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY, '7.10|2.40|0.45', '预警', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY),
-(3, '一号取水口',   UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 12 DAY, '7.55|0.90|1.20', '合格', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 12 DAY),
-(4, '二号取水口',   UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 4 DAY,  '8.10|1.80|3.20', '预警', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 4 DAY),
-(5, '长江取水泵房', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 10 DAY, '8.40|2.90|3.80', '超标', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 10 DAY),
-(6, '二号取水口',   UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 1 DAY,  '8.30|2.80|0.40', '超标', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 1 DAY);
+INSERT INTO raw_water (id, source_name, sample_at, water_sample, status, created_at, updated_at) VALUES
+(1, '长江取水泵房', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 30 DAY, '7.30|1.20|0.60', '合格', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 30 DAY, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 30 DAY),
+(2, '长江取水泵房', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY, '7.10|2.40|0.45', '预警', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY),
+(3, '一号取水口',   UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 12 DAY, '7.55|0.90|1.20', '合格', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 12 DAY, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 12 DAY),
+(4, '二号取水口',   UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 4 DAY,  '8.10|1.80|3.20', '预警', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 4 DAY, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 4 DAY),
+(5, '长江取水泵房', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 10 DAY, '8.40|2.90|3.80', '超标', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 10 DAY, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 10 DAY),
+(6, '二号取水口',   UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 1 DAY,  '8.30|2.80|0.40', '超标', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 1 DAY, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 1 DAY);
+
+-- ---------------- 原水人工重判裁决日志种子：两条「超标」记录对应的管理员重判留痕 ----------------
+INSERT INTO raw_water_judgment_log (id, raw_water_id, action, from_status, to_status, operator_name, reason, request_id, created_at) VALUES
+(1, 5, '人工重判', '预警', '超标', '李管理', '浊度 2.90 NTU 且余氯 3.80 mg/L 逼近上限，复核水样后判定超标，联动处置', 'seed-reclassify-5', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 10 DAY),
+(2, 6, '人工重判', '预警', '超标', '李管理', 'pH 8.30 且浊度 2.80 NTU 持续预警，复检确认超标', 'seed-reclassify-6', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 1 DAY);
 
 INSERT INTO sedimentation_tank (id, tank_code, capacity_m3, retention_min, status, note, created_at) VALUES
 (1, 'SED-01', 5000.00, 90, '运行', '一期平流沉淀池', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 40 DAY),

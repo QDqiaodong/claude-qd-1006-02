@@ -1,0 +1,28 @@
+# 测试环境：H2 内存库（MySQL 兼容模式），Hibernate 自动建表；排除 Redis 自动装配。
+server:
+  port: 0
+
+spring:
+  application:
+    name: waterworks-plant-test
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  datasource:
+    url: jdbc:h2:mem:waterworks_test;MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  jackson:
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+
+logging:
+  level:
+    root: WARN

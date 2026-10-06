@@ -52,4 +52,8 @@ public class RawWater {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    /** 最近一次变更（建档 / 维护 / 人工重判）时间；越权或被拒绝的重判不得改变本字段 */
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }
