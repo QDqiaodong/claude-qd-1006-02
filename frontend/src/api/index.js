@@ -26,8 +26,8 @@ export default {
   listRawWaters: (p) => call(http.get('/raw-waters', params(p))),
   createRawWater: (d) => call(http.post('/raw-waters', d)),
   updateRawWater: (id, d) => call(http.put(`/raw-waters/${id}`, d)),
-  reclassifyRawWater: (id, status) =>
-    call(http.post(`/raw-waters/${id}/reclassify`, null, params({ status }))),
+  reclassifyRawWater: (id, d) => call(http.post(`/raw-waters/${id}/reclassify`, d)),
+  getRawWaterReclassifyLogs: (id) => call(http.get(`/raw-waters/${id}/reclassify-logs`)),
 
   // ---------------- 沉淀池 ----------------
   listTanks: (p) => call(http.get('/sedimentation-tanks', params(p))),

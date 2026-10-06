@@ -23,6 +23,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 越权 / 身份不可确认：403 + 明确拒绝提示（样本结论、更新时间、裁决日志均不发生变化）
+     */
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /**
+     * 冲突：请求重放参数不一致 / 并发裁决时结论已被先到者改变，409 + 一致的冲突提示
+     */
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /**
      * 参数注解校验失败：400 + 字段名与提示
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
